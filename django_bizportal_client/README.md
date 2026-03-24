@@ -14,8 +14,8 @@ pip install git+https://github.com/ts-taisei/BizPortalClients.git#subdirectory=d
 
 ```python
 INSTALLED_APPS = [
-    'django_bizportal_client',
     # ...
+    'django_bizportal_client',
 ]
 
 TEMPLATES = [
@@ -50,7 +50,7 @@ OIDC_AUTO_CREATE_USER = False
 OIDC_IDENTITY_MODEL = 'django_bizportal_client.OIDCIdentity'
 ```
 
-## URL設定
+---
 
 `urls.py` に以下を追加します。
 
@@ -59,10 +59,19 @@ from django.urls import include, path
 
 urlpatterns = [
     path('', include('django_bizportal_client.urls')),
+    # ...
 ]
 ```
 
-### 提供URL
+---
+
+`OIDCIdentity` モデルのマイグレーションを実行します。
+
+```bash
+python manage.py migrate django_bizportal_client
+```
+
+## 提供URL
 
 - `/oidc/prepare/` で PKCE code_verifier 生成、state 生成、セッション保存、BizPortal OIDC authorize へリダイレクト
 - `/oidc/callback/` でトークン交換、userinfo 取得、ローカルユーザーへログイン
