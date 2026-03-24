@@ -1,0 +1,2 @@
+# BizPortalClients
+BizPortalのクライアントアプリ向けのパッケージ
