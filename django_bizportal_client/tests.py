@@ -1,18 +1,16 @@
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from .models import OIDCIdentity
+from .settings import get_oidc_identity_model
 from .backends import BizPortalOIDCBackend
 from .views import safe_next_path
 
 
-@override_settings(
-    OIDC_IDENTITY_MODEL='core.OIDCIdentity',
-)
 class BizPortalOIDCBackendTests(TestCase):
     def setUp(self):
         self.backend = BizPortalOIDCBackend()
         self.user_model = get_user_model()
+        self.OIDCIdentity = get_oidc_identity_model()
 
     def test_authenticate_associates_existing_identity_and_updates_profile(self):
         user = self.user_model.objects.create_user(
@@ -21,7 +19,7 @@ class BizPortalOIDCBackendTests(TestCase):
             first_name='Old',
             last_name='Name',
         )
-        identity = OIDCIdentity.objects.create(
+        identity = self.OIDCIdentity.objects.create(
             user=user,
             issuer='https://idp.example',
             subject='sub-1',
@@ -60,7 +58,7 @@ class BizPortalOIDCBackendTests(TestCase):
 
         self.assertIsNotNone(authenticated_user)
         self.assertEqual(authenticated_user.email, 'created@example.com')
-        identity = OIDCIdentity.objects.get(user=authenticated_user)
+        identity = self.OIDCIdentity.objects.get(user=authenticated_user)
         self.assertEqual(identity.issuer, 'https://idp.example')
         self.assertEqual(identity.subject, 'sub-create')
 

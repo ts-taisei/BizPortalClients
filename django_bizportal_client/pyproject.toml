@@ -12,8 +12,8 @@ description = "BizPortal OIDC IdP用の最小限のDjangoクライアント統�
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "django>=5.2,<6.0",
-    "authlib>=1.3,<2.0",
+    "Django>=5.2,<6.0",
+    "Authlib>=1.3,<2.0",
     "requests>=2.31",
 ]
 

@@ -1,9 +1,8 @@
 import logging
 import secrets
-from urllib.parse import urlencode
-
 import requests
 
+from urllib.parse import urlencode
 from authlib.integrations.base_client.errors import OAuthError
 from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseBadRequest
