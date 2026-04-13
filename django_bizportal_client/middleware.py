@@ -25,11 +25,9 @@ class OIDCSessionCleanupMiddleware:
         try:
             if timezone.now().timestamp() >= float(expires_at):
                 request.session.pop('oidc_access_token', None)
-                request.session.pop('oidc_refresh_token', None)
                 request.session.pop('oidc_access_token_expires_at', None)
         except (TypeError, ValueError):
             request.session.pop('oidc_access_token', None)
-            request.session.pop('oidc_refresh_token', None)
             request.session.pop('oidc_access_token_expires_at', None)
 
 

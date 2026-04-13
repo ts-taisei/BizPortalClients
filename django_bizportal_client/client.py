@@ -1,5 +1,7 @@
+import logging
 import requests
 
+from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.jose import jwt
 
@@ -7,6 +9,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 
 from .settings import get_setting, get_required_setting, get_oidc_identity_model
+
+
+logger = logging.getLogger(__name__)
 
 
 def oidc_config():
@@ -89,11 +94,69 @@ class BizPortalClient:
 		self.request = request
 		self.base_url = get_required_setting('OIDC_ISSUER_URL').rstrip('/')
 
+	def _clear_token_session(self, clear_refresh_token=False):
+		self.request.session.pop('oidc_access_token', None)
+		self.request.session.pop('oidc_access_token_expires_at', None)
+		if clear_refresh_token:
+			self.request.session.pop('oidc_refresh_token', None)
+		if hasattr(self.request.session, 'modified'):
+			self.request.session.modified = True
+
+	def _store_token_response(self, token):
+		access_token = token.get('access_token') or ''
+		if not access_token:
+			raise BizPortalApiError('BizPortalのトークン更新に失敗しました。', status_code=502)
+
+		expires_at = token.get('expires_at')
+		try:
+			expires_at = float(expires_at)
+		except (TypeError, ValueError):
+			try:
+				expires_in = int(token.get('expires_in') or 0)
+			except (TypeError, ValueError):
+				expires_in = 0
+			expires_at = timezone.now().timestamp() + max(expires_in, 0)
+
+		self.request.session['oidc_access_token'] = access_token
+		if token.get('refresh_token'):
+			self.request.session['oidc_refresh_token'] = token['refresh_token']
+		self.request.session['oidc_access_token_expires_at'] = expires_at
+		if hasattr(self.request.session, 'modified'):
+			self.request.session.modified = True
+		return access_token
+
+	def _refresh_access_token(self):
+		refresh_token = self.request.session.get('oidc_refresh_token', '')
+		if not refresh_token:
+			self._clear_token_session()
+			raise BizPortalApiError('BizPortalセッションの有効期限が切れています。', status_code=401)
+
+		client = build_oauth_session()
+		try:
+			token = client.refresh_token(
+				url=oidc_config()['token_endpoint'],
+				refresh_token=refresh_token,
+				timeout=get_setting('OIDC_TIMEOUT_SECONDS'),
+			)
+		except (OAuthError, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+			logger.warning('OIDC token refresh failed: %s', exc)
+			self._clear_token_session(clear_refresh_token=True)
+			raise BizPortalApiError('BizPortalセッションの有効期限が切れています。', status_code=401) from exc
+
+		return self._store_token_response(token)
+
 	def _get_access_token(self):
 		access_token = self.request.session.get('oidc_access_token', '')
 		expires_at = self.request.session.get('oidc_access_token_expires_at', 0)
-		if not access_token or timezone.now().timestamp() >= float(expires_at or 0):
-			raise BizPortalApiError('BizPortalセッションの有効期限が切れています。再ログインしてください。', status_code=401)
+		try:
+			is_expired = timezone.now().timestamp() >= (float(expires_at or 0) - 30)
+		except (TypeError, ValueError):
+			is_expired = True
+
+		if access_token and not is_expired:
+			return access_token
+
+		access_token = self._refresh_access_token()
 		return access_token
 
 	def _build_headers(self):
@@ -111,13 +174,13 @@ class BizPortalClient:
 		if response.status_code >= 400:
 			detail = payload.get('detail') or ''
 			if not detail and response.status_code == 401:
-				detail = 'BizPortalセッションの有効期限が切れています。再ログインしてください。'
+				detail = 'BizPortalセッションの有効期限が切れています。'
 			elif not detail and response.status_code == 403:
 				detail = 'BizPortalで対象Companyのownerまたはadmin権限が必要です。'
 			elif not detail and response.status_code == 409:
-				detail = '指定したユーザーIDは既に登録されています。'
+				detail = 'BizPortalで指定したユーザーIDは既に登録されています。'
 			elif not detail:
-				detail = 'BizPortal API request failed'
+				detail = 'BizPortal APIへのリクエストが失敗しました。'
 			raise BizPortalApiError(detail, status_code=response.status_code)
 
 		self.result = payload
