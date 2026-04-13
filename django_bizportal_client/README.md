@@ -210,3 +210,5 @@ def password_reset_view(request):
 - `django_bizportal_client.middleware.OIDCSessionCleanupMiddleware`: クライアントアプリの OAuth2 トークンの有効期限が切れている場合に、セッションからトークン情報を削除します。
 - `django_bizportal_client.middleware.OIDCSessionRefreshMiddleware`: クライアントアプリのユーザーのセッションが一定期間（24時間以上）経過している場合に、セッションを自動的に更新します。
 - `django_bizportal_client.context_processors.oidc_session_refresh`: BizPortal のセッションも更新するための iframe をテンプレートに提供します。
+
+API クライアント (`BizPortalClient`) は、保存済みの refresh token があれば access token の期限切れ時に自動更新を試みます。
